@@ -1,7 +1,16 @@
-from flask import Flask, render_template_string, request, redirect
-import json, os, smtplib
+from flask import Flask, render_template_string, request, redirect, jsonify
+import pytesseract
+from PIL import Image
+import io
+import json
+import os
+import smtplib
+import re
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+
+# 💡 Windows 使用者如果本地測試找不到 Tesseract，請取消下一行註解並確認路徑：
+# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 app = Flask(__name__)
 DATA_FILE = "products.json"
@@ -10,6 +19,7 @@ SUBSCRIBERS_FILE = "subscribers.json"
 GMAIL = "g9607111@gmail.com"
 GMAIL_PASSWORD = "ylpzydzc uzqdkrez"
 
+# --- 資料存取函式 ---
 def load_products():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r", encoding="utf-8") as f:
@@ -30,7 +40,13 @@ def save_subscribers(subscribers):
     with open(SUBSCRIBERS_FILE, "w", encoding="utf-8") as f:
         json.dump(subscribers, f, ensure_ascii=False, indent=2)
 
+# --- 核心功能 3：自動計算平均價與 15% 破盤警示通知 ---
 def send_email_to_all(product):
+    # 檢查是否低於市價 15%
+    if product.get('discount', 0) < 15:
+        print(f"📢 商品 {product['name']} 未達 15% 破盤門檻（當前：{product['discount']}%），不發送警示通知。")
+        return
+
     subscribers = load_subscribers()
     if not subscribers:
         return
@@ -40,23 +56,21 @@ def send_email_to_all(product):
             msg = MIMEMultipart()
             msg["From"] = GMAIL
             msg["To"] = email
-            msg["Subject"] = f"🔥 破盤雷達｜發現低價好貨：{product['name']}"
+            msg["Subject"] = f"🚨【省錢獵人暴跌警示】發現超越 15% 破盤好貨：{product['name']}"
             
             body = f"""
-嗨！破盤雷達發現新的低價商品！
+🎯 省錢獵人 24H 巡邏回報！偵測到符合低於市價 15% 的特惠商品！
 
 商品名稱：{product['name']}
 市場均價：NT$ {product['market_price']}
-特賣價格：NT$ {product['sale_price']}
-低於市價：{product['discount']}%
+破盤特價：NT$ {product['sale_price']} (🔥 狂省 {product['discount']}%！)
 商品描述：{product['description']}
 
 👉 搶購連結：{product['affiliate_link']}
 
 ---
-此信件由破盤雷達自動發送
+此信件由 省錢獵人 AI 自動發送，狩獵速度決定一切！
             """
-            
             msg.attach(MIMEText(body, "plain", "utf-8"))
             
             server = smtplib.SMTP("smtp.gmail.com", 587)
@@ -64,47 +78,42 @@ def send_email_to_all(product):
             server.login(GMAIL, GMAIL_PASSWORD)
             server.sendmail(GMAIL, email, msg.as_string())
             server.quit()
+            print(f"⚡ 省錢獵人秒發通知成功 -> {email}")
         except Exception as e:
             print(f"寄信失敗 {email}: {e}")
 
+# --- HTML 模板介面優化 ---
 TEMPLATE = """
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>破盤雷達</title>
+<title>省錢獵人 Saver Hunter</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: Arial, sans-serif; background: #f0f2f5; }
-  .header { background: linear-gradient(135deg, #e74c3c, #c0392b); color: white; padding: 20px; text-align: center; }
-  .header h1 { font-size: 28px; }
-  .header p { opacity: 0.9; margin-top: 5px; }
+  .header { background: linear-gradient(135deg, #2c3e50, #2980b9); color: white; padding: 30px 20px; text-align: center; }
+  .header h1 { font-size: 32px; font-weight: bold; }
+  .header p { opacity: 0.9; margin-top: 8px; font-size: 15px; }
   .container { max-width: 900px; margin: 20px auto; padding: 0 15px; }
   .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
   .stats { display: flex; gap: 15px; margin-bottom: 20px; }
   .stat { flex: 1; background: white; border-radius: 12px; padding: 15px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-  .stat h2 { color: #e74c3c; font-size: 28px; }
+  .stat h2 { color: #2980b9; font-size: 28px; }
   .stat p { color: #666; font-size: 14px; }
   .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 15px; }
-  .product-card { background: white; border-radius: 12px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-top: 4px solid #e74c3c; }
+  .product-card { background: white; border-radius: 12px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-top: 4px solid #2980b9; position: relative;}
   .product-card h3 { font-size: 15px; margin-bottom: 10px; color: #333; }
   .original-price { color: #999; text-decoration: line-through; font-size: 14px; }
   .sale-price { color: #e74c3c; font-size: 22px; font-weight: bold; }
-  .badge { display: inline-block; background: #e74c3c; color: white; padding: 3px 10px; border-radius: 20px; font-size: 12px; margin: 8px 0; }
-  .btn { display: block; text-align: center; background: #e74c3c; color: white; padding: 10px; border-radius: 8px; text-decoration: none; margin-top: 10px; font-weight: bold; }
-  .btn:hover { background: #c0392b; }
+  .badge { display: inline-block; background: #e74c3c; color: white; padding: 3px 10px; border-radius: 20px; font-size: 12px; margin: 8px 0; font-weight: bold; }
+  .btn { display: block; text-align: center; background: #2980b9; color: white; padding: 10px; border-radius: 8px; text-decoration: none; margin-top: 10px; font-weight: bold; }
+  .btn:hover { background: #2471a3; }
   .form-group { margin-bottom: 15px; }
   label { display: block; margin-bottom: 5px; font-weight: bold; color: #444; }
   input[type=email] { width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 15px; }
-  .submit-btn { background: #e74c3c; color: white; border: none; padding: 12px 30px; border-radius: 8px; font-size: 16px; cursor: pointer; width: 100%; margin-top: 10px; }
-  .plans { display: flex; gap: 15px; }
-  .plan { flex: 1; border: 2px solid #ddd; border-radius: 12px; padding: 20px; text-align: center; }
-  .plan.hot { border-color: #e74c3c; }
-  .plan h3 { color: #e74c3c; margin-bottom: 10px; }
-  .plan-price { font-size: 26px; font-weight: bold; color: #333; margin: 10px 0; }
-  .plan ul { list-style: none; text-align: left; margin: 10px 0; }
-  .plan ul li { padding: 5px 0; color: #555; }
+  .submit-btn { background: #e74c3c; color: white; border: none; padding: 12px 30px; border-radius: 8px; font-size: 16px; cursor: pointer; width: 100%; margin-top: 10px; font-weight: bold; }
   .admin-link { text-align: right; margin-bottom: 10px; }
   .admin-link a { color: #999; font-size: 13px; }
   .success { background: #d4edda; color: #155724; padding: 12px; border-radius: 8px; margin-bottom: 15px; }
@@ -112,8 +121,8 @@ TEMPLATE = """
 </head>
 <body>
 <div class="header">
-  <h1>🔥 破盤雷達</h1>
-  <p>Z世代必備｜即時偵測破盤好貨，搶先特定買家一步</p>
+  <h1>🏹 省錢獵人 Saver Hunter</h1>
+  <p>💡 AI 24h 跨平台巡邏｜精準圖文 OCR 識圖｜低於市價 15% 自動秒發警示</p>
 </div>
 
 <div class="container">
@@ -124,75 +133,55 @@ TEMPLATE = """
   <div class="stats">
     <div class="stat">
       <h2>{{ products|length }}</h2>
-      <p>目前監控商品</p>
+      <p>🤖 巡邏監控中商品</p>
     </div>
     <div class="stat">
       <h2>{{ subscriber_count }}</h2>
-      <p>📧 訂閱人數</p>
+      <p>📧 警示接收人數</p>
     </div>
     <div class="stat">
-      <h2>即時</h2>
-      <p>狩獵版通知速度</p>
+      <h2>AI 即時</h2>
+      <p>手寫與折價券偵測速度</p>
     </div>
   </div>
 
   {% if products %}
-  <h2 style="margin-bottom:15px">📦 目前特價商品</h2>
+  <h2 style="margin-bottom:15px">📦 24H 巡邏發現好貨</h2>
   <div class="product-grid">
     {% for p in products %}
     <div class="product-card">
       <h3>{{ p.name }}</h3>
       <div class="original-price">市場均價 NT$ {{ p.market_price }}</div>
       <div class="sale-price">NT$ {{ p.sale_price }}</div>
-      <span class="badge">🔥 低於市價 {{ p.discount }}%</span>
+      <span class="badge" style="background: {% if p.discount >= 15 %}#e74c3c{% else %}#f39c12{% endif %};">
+        🔥 低於市價 {{ p.discount }}% {% if p.discount >= 15 %}(已觸發警示){% endif %}
+      </span>
       <p style="font-size:13px;color:#666;margin:8px 0">{{ p.description }}</p>
-      <a href="{{ p.affiliate_link }}" class="btn" target="_blank">👉 搶購去</a>
+      <a href="{{ p.affiliate_link }}" class="btn" target="_blank">👉 立即搶購</a>
     </div>
     {% endfor %}
   </div>
   {% else %}
   <div class="card" style="text-align:center;color:#999;padding:40px">
     <p style="font-size:40px">🔍</p>
-    <p>目前還沒有特價商品，請稍後再來！</p>
+    <p>AI 全天候巡邏中，目前暫無新貼文好貨，請稍後再來！</p>
   </div>
   {% endif %}
 
   <br>
   <div class="card">
-    <h2 style="margin-bottom:15px">🔔 免費訂閱通知</h2>
-    <p style="color:#666;margin-bottom:15px">有破盤商品時，自動寄 Email 通知你！</p>
+    <h2 style="margin-bottom:15px">🔔 訂閱 15% 破盤秒發通知</h2>
+    <p style="color:#666;margin-bottom:15px">當 AI 識圖偵測到低於市場均價 15% 的暴跌好貨時，立刻發信通知你！</p>
     <form method="POST" action="/subscribe">
       <div class="form-group">
-        <label>你的 Email</label>
-        <input type="email" name="email" placeholder="輸入 Email" required>
+        <label>接收通知 Email</label>
+        <input type="email" name="email" placeholder="請輸入您的電子信箱" required>
       </div>
-      <button class="submit-btn">免費訂閱通知 🔔</button>
+      <button class="submit-btn">開啟 AI 破盤警示 🔔</button>
     </form>
   </div>
 
-  <h2 style="margin-bottom:15px">💎 訂閱方案</h2>
-  <div class="plans">
-    <div class="plan">
-      <h3>基礎版</h3>
-      <div class="plan-price">免費</div>
-      <ul>
-        <li>✅ 延遲 10 分鐘通知</li>
-        <li>✅ 1 個監控關鍵字</li>
-        <li>❌ IG 限動偵測</li>
-      </ul>
-    </div>
-    <div class="plan hot">
-      <h3>🏆 狩獵版</h3>
-      <div class="plan-price">NT$ 49 / 月</div>
-      <ul>
-        <li>✅ 即時通知</li>
-        <li>✅ 解鎖 IG 限動偵測</li>
-        <li>✅ 無限關鍵字</li>
-      </ul>
-    </div>
-  </div>
-
-  <div class="admin-link"><a href="/admin">管理後台</a></div>
+  <div class="admin-link"><a href="/admin">AI 管理與手動錄入後台</a></div>
 </div>
 </body>
 </html>
@@ -203,61 +192,113 @@ ADMIN_TEMPLATE = """
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<title>管理後台</title>
+<title>省錢獵人控制台</title>
 <style>
-  body { font-family: Arial, sans-serif; max-width: 600px; margin: 30px auto; padding: 0 15px; }
-  h1 { color: #e74c3c; }
+  body { font-family: Arial, sans-serif; max-width: 600px; margin: 30px auto; padding: 0 15px; background: #f4f6f7; }
+  h1 { color: #2c3e50; margin-bottom: 10px; }
   .form-group { margin-bottom: 15px; }
   label { display: block; margin-bottom: 5px; font-weight: bold; }
   input { width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 15px; }
-  button { background: #e74c3c; color: white; border: none; padding: 12px 30px; border-radius: 8px; font-size: 16px; cursor: pointer; width: 100%; margin-top: 10px; }
-  .back { display: inline-block; margin-bottom: 20px; color: #e74c3c; text-decoration: none; }
-  .item { background: #f9f9f9; padding: 10px 15px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-  .delete-btn { background: #999; color: white; border: none; padding: 5px 12px; border-radius: 5px; cursor: pointer; width: auto; margin: 0; }
+  button { background: #2980b9; color: white; border: none; padding: 12px 30px; border-radius: 8px; font-size: 16px; cursor: pointer; width: 100%; margin-top: 10px; font-weight: bold; }
+  .back { display: inline-block; margin-bottom: 20px; color: #2980b9; text-decoration: none; }
+  .item { background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+  .delete-btn { background: #e74c3c; color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; width: auto; margin: 0; }
   .success { background: #d4edda; color: #155724; padding: 12px; border-radius: 8px; margin-bottom: 15px; }
+  .ocr-box { background: #eaf2f8; border: 2px dashed #2980b9; border-radius: 12px; padding: 20px; margin-bottom: 25px; text-align: center; }
 </style>
 </head>
 <body>
-<a class="back" href="/">← 回首頁</a>
-<h1>🛠 管理後台</h1>
-<p style="color:#666;margin-bottom:5px">訂閱人數：<strong>{{ subscriber_count }} 人</strong></p>
-<p style="color:#666;margin-bottom:20px">新增商品後會自動寄 Email 通知所有訂閱者！</p>
+<a class="back" href="/">← 返回省錢獵人首頁</a>
+<h1>🛠 省錢獵人控制中心</h1>
+<p style="color:#666;margin-bottom:20px">當前訂閱：<strong>{{ subscriber_count }} 人</strong></p>
+
+<div class="ocr-box">
+  <h3 style="color: #2980b9; margin-bottom: 5px;">📸 功能二：AI 貼文與手寫價格識圖 (OCR)</h3>
+  <p style="font-size: 13px; color: #555; margin-bottom: 12px;">上傳 IG 限動、手寫標籤或折扣截圖，自動提取關鍵數字與代碼</p>
+  <input type="file" id="ocr_file" accept="image/*" style="border: none; background: transparent; margin-bottom: 10px;">
+  <button type="button" id="ocr_btn" onclick="runOCR()" style="background: #27ae60; margin-top: 5px;">🚀 開始智慧分析圖片</button>
+  <div id="ocr_result" style="margin-top:10px; font-size:13px; color:#2c3e50; font-weight:bold; text-align:left; background:white; padding:10px; border-radius:6px; display:none;"></div>
+</div>
 
 {% if success %}
 <div class="success">✅ {{ success }}</div>
 {% endif %}
 
-<form method="POST" action="/admin/add">
+<form method="POST" action="/admin/add" id="product_form">
+  <h3>手動或 AI 自動填入表單：</h3><br>
   <div class="form-group">
-    <label>商品名稱</label>
-    <input name="name" placeholder="例如：iPhone 15 128G 黑色" required>
+    <label>商品名稱 / 識別出的折價碼</label>
+    <input name="name" id="p_name" placeholder="例如：iPhone 15 128G 或輸入折價碼 SAVE15" required>
   </div>
   <div class="form-group">
     <label>市場均價 (NT$)</label>
-    <input name="market_price" type="number" placeholder="例如：28000" required>
+    <input name="market_price" id="p_market" type="number" placeholder="例如：25000" required>
   </div>
   <div class="form-group">
-    <label>特賣價格 (NT$)</label>
-    <input name="sale_price" type="number" placeholder="例如：22000" required>
+    <label>特賣價格 / 手寫識別價格 (NT$)</label>
+    <input name="sale_price" id="p_sale" type="number" placeholder="例如：1990" required>
   </div>
   <div class="form-group">
-    <label>商品描述</label>
-    <input name="description" placeholder="例如：九成新，附原廠配件">
+    <label>商品描述來源</label>
+    <input name="description" id="p_desc" placeholder="例如：由 AI 識圖自動帶入或手動輸入描述">
   </div>
   <div class="form-group">
-    <label>商品連結（蝦皮/露天/任何平台）</label>
-    <input name="affiliate_link" placeholder="貼上商品連結">
+    <label>商品連結 / 平台出處</label>
+    <input name="affiliate_link" placeholder="貼上蝦皮、露天或 IG 貼文網址">
   </div>
-  <button type="submit">➕ 新增商品並通知訂閱者</button>
+  <button type="submit">➕ 確認上架並進行 15% 警示校對</button>
 </form>
 
+<script>
+async function runOCR() {
+    const fileInput = document.getElementById('ocr_file');
+    const btn = document.getElementById('ocr_btn');
+    const resultDiv = document.getElementById('ocr_result');
+    if(fileInput.files.length === 0) { alert('請先選取截圖檔案！'); return; }
+
+    btn.innerText = 'AI 分析中...';
+    btn.disabled = true;
+    resultDiv.style.display = 'none';
+
+    const formData = new FormData();
+    formData.append('image', fileInput.files[0]);
+
+    try {
+        const res = await fetch('/ocr', { method: 'POST', body: formData });
+        const data = await res.json();
+        
+        resultDiv.style.display = 'block';
+        let report = `【AI 識別報告】<br>🔹 找到的所有可能價格：${data.prices.join(', ') || '未偵測到'}<br>🔹 找到的可能折扣碼：${data.promos.join(', ') || '未偵測到'}`;
+        resultDiv.innerHTML = report;
+
+        // 智慧帶入表單欄位
+        if(data.prices.length > 0) {
+            document.getElementById('p_sale').value = data.prices[0];
+        }
+        if(data.promos.length > 0) {
+            document.getElementById('p_name').value = "偵測到優待碼：" + data.promos[0];
+        } else {
+            document.getElementById('p_name').value = "AI 識圖自動生成商品";
+        }
+        document.getElementById('p_desc').value = "擷取前30字內容：" + data.text.replace(/\\s+/g, ' ').substring(0, 30);
+        
+        alert('AI 辨識完成！已自動為你填寫表單內容，請手動補齊「市場均價」進行對比。');
+    } catch(e) {
+        alert('本地辨識發生異常，請確認伺服器底層是否安裝 Tesseract 引擎。');
+    } finally {
+        btn.innerText = '🚀 開始智慧分析圖片';
+        btn.disabled = false;
+    }
+}
+</script>
+
 <div style="margin-top:30px">
-  <h2>目前商品（{{ products|length }} 件）</h2>
+  <h2>目前架上監控商品（{{ products|length }} 件）</h2>
   {% for p in products %}
   <div class="item">
-    <span>{{ p.name }} — NT$ {{ p.sale_price }}</span>
+    <span><strong>{{ p.name }}</strong> — 特價 NT$ {{ p.sale_price }} ({{ p.discount }}% Off)</span>
     <form method="POST" action="/admin/delete/{{ loop.index0 }}">
-      <button class="delete-btn">刪除</button>
+      <button class="delete-btn">下架</button>
     </form>
   </div>
   {% endfor %}
@@ -265,6 +306,8 @@ ADMIN_TEMPLATE = """
 </body>
 </html>
 """
+
+# --- 路由與後端處理邏輯 ---
 
 @app.route("/")
 def index():
@@ -281,7 +324,7 @@ def subscribe():
         save_subscribers(subscribers)
     products = load_products()
     subscriber_count = len(subscribers)
-    return render_template_string(TEMPLATE, products=products, subscriber_count=subscriber_count, success=f"{email} 訂閱成功！有破盤好貨會立刻通知你")
+    return render_template_string(TEMPLATE, products=products, subscriber_count=subscriber_count, success=f"【{email}】成功開啟省錢獵人 24H 破盤秒發監控通知！")
 
 @app.route("/admin")
 def admin():
@@ -295,6 +338,7 @@ def add_product():
     market = int(request.form["market_price"])
     sale = int(request.form["sale_price"])
     discount = int((1 - sale/market) * 100)
+    
     product = {
         "name": request.form["name"],
         "market_price": market,
@@ -305,16 +349,67 @@ def add_product():
     }
     products.append(product)
     save_products(products)
+    
+    # 調用警示校對函式
     send_email_to_all(product)
+    
     subscriber_count = len(load_subscribers())
-    return render_template_string(ADMIN_TEMPLATE, products=products, subscriber_count=subscriber_count, success=f"商品新增成功！已通知 {subscriber_count} 位訂閱者")
+    return render_template_string(ADMIN_TEMPLATE, products=products, subscriber_count=subscriber_count, success=f"商品處理完成！若符合 15% 降幅，省錢獵人系統已同步在背景啟動秒發通知機制。")
 
 @app.route("/admin/delete/<int:idx>", methods=["POST"])
 def delete_product(idx):
     products = load_products()
-    products.pop(idx)
-    save_products(products)
+    if 0 <= idx < len(products):
+        products.pop(idx)
+        save_products(products)
     return redirect("/admin")
 
+# --- AI 精準識圖 OCR 路由 ---
+@app.route("/ocr", methods=["POST"])
+def ocr():
+    if 'image' not in request.files:
+        return jsonify({"error": "沒有圖片"}), 400
+    file = request.files['image']
+    img = Image.open(io.BytesIO(file.read()))
+    
+    text = pytesseract.image_to_string(img, lang='chi_tra+eng')
+    
+    # 2a. 抓取手寫或網頁上的價格（支援 $、NT$、或是 3-6 位數的純數字）
+    prices = re.findall(r'(?:NT\$?|\$)?\s*(\d{3,6})', text)
+    prices = [p for p in prices if int(p) != 2026]
+    
+    # 2b. 抓取大寫隱藏折價碼（如貼文中的 SAVE15, OFF30, DISCOUNT10）
+    promos = re.findall(r'([A-Z]{3,10}\d{2,3})', text)
+    
+    return jsonify({"text": text, "prices": prices, "promos": promos})
+
+# --- 模擬 24 小時跨平台巡邏 API 接口 ---
+@app.route("/api/patrol_webhook", methods=["POST"])
+def patrol_webhook():
+    data = request.json
+    if not data or 'name' not in data or 'market_price' not in data or 'sale_price' not in data:
+        return jsonify({"error": "無效的巡邏資料"}), 400
+        
+    market = int(data["market_price"])
+    sale = int(data["sale_price"])
+    discount = int((1 - sale/market) * 100)
+    
+    product = {
+        "name": f"【巡邏偵測】{data['name']}",
+        "market_price": market,
+        "sale_price": sale,
+        "discount": discount,
+        "description": data.get("description", "來自跨平台巡邏自動採集數據"),
+        "affiliate_link": data.get("affiliate_link", "#")
+    }
+    
+    products = load_products()
+    products.append(product)
+    save_products(products)
+    
+    send_email_to_all(product)
+    
+    return jsonify({"status": "巡邏完成", "discount": discount, "alert_triggered": discount >= 15})
+
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=True)
