@@ -1,5 +1,5 @@
 from flask import Flask, render_template_string, request, redirect, jsonify
-import easyocr
+import pytesseract
 from PIL import Image
 import io
 import json
@@ -243,7 +243,7 @@ ADMIN_TEMPLATE = """
     <input name="description" id="p_desc" placeholder="例如：由 AI 識圖自動帶入或手動輸入描述">
   </div>
   <div class="form-group">
-    <label>商品連結 / 平台出處</label>
+    <label>商品連結 / 平台出處</label>3
     <input name="affiliate_link" placeholder="貼上蝦皮、露天或 IG 貼文網址">
   </div>
   <button type="submit">➕ 確認上架並進行 15% 警示校對</button>
@@ -280,7 +280,7 @@ async function runOCR() {
         } else {
             document.getElementById('p_name').value = "AI 識圖自動生成商品";
         }
-       document.getElementById('p_desc').value = "擷取前30字內容：" + data.text.replace(/\s+/g, ' ').substring(0, 30);
+        document.getElementById('p_desc').value = "擷取前30字內容：" + data.text.replace(/\s+/g, ' ').substring(0, 30);
         
         alert('AI 辨識完成！已自動為你填寫表單內容，請手動補齊「市場均價」進行對比。');
     } catch(e) {
@@ -367,20 +367,12 @@ def delete_product(idx):
 # --- AI 精準識圖 OCR 路由 ---
 @app.route("/ocr", methods=["POST"])
 def ocr():
-if 'image' not in request.files:
+    if 'image' not in request.files:
         return jsonify({"error": "沒有圖片"}), 400
     file = request.files['image']
+    img = Image.open(io.BytesIO(file.read()))
     
-    # 讀取圖片二進位資料並交給 easyocr 辨識
-    image_bytes = file.read()
-    
-    try:
-        reader = easyocr.Reader(['ch_tra', 'en'])
-        # 直接丟入二進位資料讀取
-        result = reader.readtext(image_bytes, detail=0)
-        text = " ".join(result)
-    except Exception as e:
-        return jsonify({"error": f"AI 識圖發生成本異常: {str(e)}"}), 500
+    text = pytesseract.image_to_string(img, lang='chi_tra+eng')
     
     # 2a. 抓取手寫或網頁上的價格（支援 $、NT$、或是 3-6 位數的純數字）
     prices = re.findall(r'(?:NT\$?|\$)?\s*(\d{3,6})', text)
