@@ -79,8 +79,9 @@ def send_email_to_all(product):
             server.sendmail(GMAIL, email, msg.as_string())
             server.quit()
             print(f"⚡ 省錢獵人秒發通知成功 -> {email}")
-        except Exception as e:
-            print(f"寄信失敗 {email}: {e}")
+
+def run_scraping_job():
+    print("📢 獵人出動：開始搜尋降價商品...")
 
 # --- HTML 模板介面優化 ---
 TEMPLATE = """
@@ -414,10 +415,8 @@ def patrol_webhook():
 import os
 
 if __name__ == "__main__":
-    # 使用你在 .github/workflows/main.yml 中設定的環境變數名稱
     if os.getenv("RUN_TYPE") == "CRAWLER":
         print("偵測到 CRAWLER 模式，執行自動化任務...")
-        # 若你有自動化爬蟲函式，請在這裡呼叫
+        run_scraping_job()
     else:
-        # 一般情況下才啟動網站
         app.run(host='0.0.0.0', port=5000, debug=True)
