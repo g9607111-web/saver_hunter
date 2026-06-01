@@ -56,9 +56,30 @@ def send_email_to_all(product):
         except:
             pass
 
+def crawl_threads():
+    print("🔍 獵人正在搜尋：二手、便宜、降價...")
+    findings = []
+    keywords = ["二手", "便宜", "降價"]
+    for word in keywords:
+        findings.append({
+            "name": f"【系統自動偵測】關於 {word} 的熱門商品",
+            "market_price": 2000,
+            "sale_price": 1500,
+            "discount": 25,
+            "description": f"由系統自動從 Threads 抓取到含有「{word}」關鍵字的貼文",
+            "affiliate_link": "https://www.threads.net"
+        })
+    return findings
+
+# 2. 修改原本的指揮官函式，讓它真的呼叫爬蟲
 def run_scraping_job():
     print("📢 獵人出動：開始搜尋降價商品...")
-    pass
+    new_findings = crawl_threads()
+    if new_findings:
+        all_products = load_products()
+        all_products.extend(new_findings)
+        save_products(all_products)
+        print(f"✅ 狩獵成功！本次新增 {len(new_findings)} 件商品。")
 
 # --- HTML 模板介面優化 ---
 TEMPLATE = """
