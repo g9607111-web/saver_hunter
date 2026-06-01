@@ -22,7 +22,7 @@ from pymongo import MongoClient
 # 1. 初始化資料庫連線 (這段放在 import 下方)
 MONGODB_URI = os.getenv("MONGODB_URI")
 client = MongoClient(MONGODB_URI)
-db = client.get_default_database()
+db = client['saver_db']  # 明確指定資料庫名稱為 'saver_db'
 products_col = db.products
 
 # 2. 修改 load_products 函式 (取代原本的第 12-16 行)
