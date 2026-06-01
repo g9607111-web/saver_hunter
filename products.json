@@ -6,5 +6,29 @@
     "discount": 21,
     "description": "九成新，附原廠充電器",
     "affiliate_link": "hppts://shopee.tw"
+  },
+  {
+    "name": "【系統自動偵測】關於 二手 的熱門商品",
+    "market_price": 2000,
+    "sale_price": 1500,
+    "discount": 25,
+    "description": "由系統自動從 Threads 抓取到含有「二手」關鍵字的貼文",
+    "affiliate_link": "https://www.threads.net"
+  },
+  {
+    "name": "【系統自動偵測】關於 便宜 的熱門商品",
+    "market_price": 2000,
+    "sale_price": 1500,
+    "discount": 25,
+    "description": "由系統自動從 Threads 抓取到含有「便宜」關鍵字的貼文",
+    "affiliate_link": "https://www.threads.net"
+  },
+  {
+    "name": "【系統自動偵測】關於 降價 的熱門商品",
+    "market_price": 2000,
+    "sale_price": 1500,
+    "discount": 25,
+    "description": "由系統自動從 Threads 抓取到含有「降價」關鍵字的貼文",
+    "affiliate_link": "https://www.threads.net"
   }
 ]
