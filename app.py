@@ -71,7 +71,6 @@ def crawl_threads():
         })
     return findings
 
-# 2. 修改原本的指揮官函式，讓它真的呼叫爬蟲
 def run_scraping_job():
     print("📢 獵人出動：開始搜尋降價商品...")
     new_findings = crawl_threads()
