@@ -16,16 +16,26 @@ SUBSCRIBERS_FILE = "subscribers.json"
 GMAIL = "g9607111@gmail.com"
 GMAIL_PASSWORD = "ylpzydzc uzqdkrez"
 
+import os
+from pymongo import MongoClient
+
+# 1. 初始化資料庫連線 (這段放在 import 下方)
+MONGODB_URI = os.getenv("MONGODB_URI")
+client = MongoClient(MONGODB_URI)
+db = client.get_default_database()
+products_col = db.products
+
+# 2. 修改 load_products 函式 (取代原本的第 12-16 行)
 def load_products():
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
+    # 改為從 MongoDB 撈取資料
+    return list(products_col.find({}, {"_id": 0}))
 
+# 3. 修改 save_products 函式 (取代原本的第 18-20 行)
 def save_products(products):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(products, f, ensure_ascii=False, indent=2)
-
+    # 先清空資料庫內的舊資料，再存入新的
+    products_col.delete_many({})
+    if products:
+        products_col.insert_many(products)
 def load_subscribers():
     if os.path.exists(SUBSCRIBERS_FILE):
         with open(SUBSCRIBERS_FILE, "r", encoding="utf-8") as f:
