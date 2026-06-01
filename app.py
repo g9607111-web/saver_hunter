@@ -81,13 +81,20 @@ import requests
 from bs4 import BeautifulSoup
 
 def crawl_threads():
-    # 這裡示範如何對某個網站發出請求
-    url = "https://www.threads.net/..." # 你想爬取的網址
-    response = requests.get(url)
-    soup = BeautifulSoup(response.text, 'html.parser')
-
-    # 使用 soup.find() 或 select() 抓取真正的商品標題、價格
-    # 將抓到的資料存進 findings 列表中
+    print("🔍 獵人正在執行真實搜尋...")
+    
+    # 【關鍵步驟】務必在這裡先定義 findings 變數
+    findings = []
+    
+    # 接下來才是你的爬蟲邏輯
+    try:
+        # ... 你的 requests 與 BeautifulSoup 程式碼 ...
+        # ... 將抓到的資料 append 到 findings ...
+        pass # 測試時可以先留著這個
+    except Exception as e:
+        print(f"爬蟲發生錯誤: {e}")
+        
+    # 最後才回傳
     return findings
 
 def run_scraping_job():
