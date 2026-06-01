@@ -36,16 +36,24 @@ def save_products(products):
     products_col.delete_many({})
     if products:
         products_col.insert_many(products)
+# 1. 在程式碼上方宣告 collection (緊接在 products_col 後面)
+subscribers_col = db.subscribers
+
+# 2. 修改 load_subscribers 函式
 def load_subscribers():
-    if os.path.exists(SUBSCRIBERS_FILE):
-        with open(SUBSCRIBERS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
+    # 從 MongoDB 的 subscribers collection 撈取所有訂閱者
+    # 如果資料庫沒有資料，回傳空串列 []
+    subscribers = list(subscribers_col.find({}, {"_id": 0}))
+    return [s['email'] for s in subscribers] if subscribers else []
 
-def save_subscribers(subscribers):
-    with open(SUBSCRIBERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(subscribers, f, ensure_ascii=False, indent=2)
-
+# 3. 修改 save_subscribers 函式
+def save_subscribers(subscriber_list):
+    # 先清空舊的訂閱者資料
+    subscribers_col.delete_many({})
+    # 將串列格式轉為 MongoDB 需要的 dict 格式存入
+    if subscriber_list:
+        data_to_insert = [{"email": email} for email in subscriber_list]
+        subscribers_col.insert_many(data_to_insert)
 def send_email_to_all(product):
     if product.get('discount', 0) < 15:
         return
