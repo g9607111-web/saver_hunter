@@ -129,14 +129,21 @@ def crawl_shopee():
     return findings
         
 def run_scraping_job():
-    print("📢 獵人出動：開始搜尋降價商品...")
-    new_findings = crawl_threads()
+    print("📢 獵人出動：開始全平台搜尋...")
+    
+    # 合併兩個平台的資料
+    new_findings = crawl_threads() + crawl_shopee()
+    
     if new_findings:
         all_products = load_products()
         all_products.extend(new_findings)
         save_products(all_products)
+        # 如果有多個商品，可以選擇性地分別發送 Email
+        for p in new_findings:
+            send_email_to_all(p)
         print(f"✅ 狩獵成功！本次新增 {len(new_findings)} 件商品。")
-
+    else:
+        print("⚠️ 本次巡邏未發現新商品。")
 # --- HTML 模板介面優化 ---
 TEMPLATE = """
 <!DOCTYPE html>
