@@ -433,13 +433,15 @@ def patrol_webhook():
 import os
 
 if __name__ == '__main__':
-    # 讀取 Render 分配的 PORT，如果沒有則使用 5000
+    # 讀取 Render 分配的 PORT
     port = int(os.environ.get("PORT", 5000))
     
-    # 判斷模式：只有明確設定為 CRAWLER 才跑爬蟲
-    if os.getenv("RUN_TYPE") == "CRAWLER":
+    # 判斷模式：只有明確設定為 CRAWLER 環境變數才跑爬蟲
+    # 這樣可以確保預設情況下，Render 會跑進 else 啟動網頁服務
+    if os.environ.get("RUN_TYPE") == "CRAWLER":
         print("偵測到 CRAWLER 模式，執行自動化任務...")
         run_scraping_job()
     else:
-        # 網頁服務模式：一定要監聽 Render 指定的 port
+        print(f"啟動網頁服務，監聽 Port: {port}")
+        # 去掉 debug=True，生產環境不建議開啟 debug
         app.run(host='0.0.0.0', port=port)
