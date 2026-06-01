@@ -77,19 +77,17 @@ def send_email_to_all(product):
         except:
             pass
 
+import requests
+from bs4 import BeautifulSoup
+
 def crawl_threads():
-    print("🔍 獵人正在搜尋：二手、便宜、降價...")
-    findings = []
-    keywords = ["二手", "便宜", "降價"]
-    for word in keywords:
-        findings.append({
-            "name": f"【系統自動偵測】關於 {word} 的熱門商品",
-            "market_price": 2000,
-            "sale_price": 1500,
-            "discount": 25,
-            "description": f"由系統自動從 Threads 抓取到含有「{word}」關鍵字的貼文",
-            "affiliate_link": "https://www.threads.net"
-        })
+    # 這裡示範如何對某個網站發出請求
+    url = "https://www.threads.net/..." # 你想爬取的網址
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+
+    # 使用 soup.find() 或 select() 抓取真正的商品標題、價格
+    # 將抓到的資料存進 findings 列表中
     return findings
 
 def run_scraping_job():
