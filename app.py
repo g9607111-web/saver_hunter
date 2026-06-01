@@ -14,7 +14,8 @@ DATA_FILE = "products.json"
 SUBSCRIBERS_FILE = "subscribers.json"
 
 GMAIL = "g9607111@gmail.com"
-GMAIL_PASSWORD = "ylpzydzc uzqdkrez"
+import os
+GMAIL_PASSWORD = os.getenv("GMAIL_PASSWORD")
 
 import os
 from pymongo import MongoClient
