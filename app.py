@@ -412,4 +412,6 @@ def patrol_webhook():
     return jsonify({"status": "巡邏完成", "discount": discount, "alert_triggered": discount >= 15})
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # 判斷是否為自動化爬蟲模式，若是則不啟動網頁服務
+    if os.getenv("RUN_TYPE") != "CRAWLER":
+        app.run(host='0.0.0.0', port=5000, debug=True)
