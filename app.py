@@ -443,5 +443,4 @@ if __name__ == '__main__':
         run_scraping_job()
     else:
         print(f"啟動網頁服務，監聽 Port: {port}")
-        # 去掉 debug=True，生產環境不建議開啟 debug
         app.run(host='0.0.0.0', port=port)
