@@ -411,7 +411,13 @@ def patrol_webhook():
     
     return jsonify({"status": "巡邏完成", "discount": discount, "alert_triggered": discount >= 15})
 
+import os
+
 if __name__ == "__main__":
-    # 判斷是否為自動化爬蟲模式，若是則不啟動網頁服務
-    if os.getenv("RUN_TYPE") != "CRAWLER":
+    # 檢查有沒有環境變數叫 RUN_TYPE，如果是 CRAWLER 就不啟動網頁
+    if os.getenv("RUN_TYPE") == "CRAWLER":
+        print("正在執行自動化爬蟲任務，跳過網站啟動。")
+        # 這裡可以呼叫你的爬蟲函式，例如: run_scraping_job()
+    else:
+        # 一般情況下才啟動網站
         app.run(host='0.0.0.0', port=5000, debug=True)
