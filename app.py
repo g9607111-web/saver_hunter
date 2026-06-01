@@ -82,8 +82,6 @@ def send_email_to_all(product):
 
 def run_scraping_job():
     print("📢 獵人出動：開始搜尋降價商品...")
-    # 這裡未來會放入爬蟲邏輯
-    # 範例：為了避免錯誤，我們先放一個 pass，代表什麼都不做但結構完整
     pass
 
 # --- HTML 模板介面優化 ---
