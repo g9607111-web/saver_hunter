@@ -5,3 +5,5 @@ pandas
 requests
 pytesseract
 pillow
+pymongo
+dnspython
