@@ -81,22 +81,52 @@ import requests
 from bs4 import BeautifulSoup
 
 def crawl_threads():
-    print("🔍 獵人正在執行真實搜尋...")
-    
-    # 【關鍵步驟】務必在這裡先定義 findings 變數
     findings = []
-    
-    # 接下來才是你的爬蟲邏輯
     try:
-        # ... 你的 requests 與 BeautifulSoup 程式碼 ...
-        # ... 將抓到的資料 append 到 findings ...
-        pass # 測試時可以先留著這個
+        # 範例：發出 HTTP 請求
+        response = requests.get("https://www.threads.net/...") 
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # 假設你解析到的標題是 title，價格是 price
+        # 這邊需要根據你想爬的網站 HTML 結構來寫
+        new_item = {
+            "name": "真實商品名稱", 
+            "market_price": 2000,
+            "sale_price": 1500,
+            "discount": 25,
+            "description": "這是真實爬到的資料！",
+            "affiliate_link": "https://..."
+        }
+        findings.append(new_item)
     except Exception as e:
         print(f"爬蟲發生錯誤: {e}")
-        
-    # 最後才回傳
     return findings
 
+def crawl_shopee():
+    print("🛒 獵人正在搜尋蝦皮商品...")
+    findings = []
+    
+    # 這裡示範使用 API 獲取資料 (請替換為真實 API 或邏輯)
+    # 你可以去 RapidAPI 找免費的 Shopee API 來替換這裡的 URL
+    try:
+        # 這是一個範例架構，你需要替換成實際運作的 API 連結
+        # response = requests.get("https://api.shopee-example.com/search?keyword=二手")
+        # data = response.json()
+        
+        # 為了讓你現在能看到效果，我們先模擬抓到的資料
+        findings.append({
+            "name": "【蝦皮自動偵測】二手精選商品",
+            "market_price": 1200,
+            "sale_price": 900,
+            "discount": 25,
+            "description": "來自蝦皮的優惠商品",
+            "affiliate_link": "https://shopee.tw"
+        })
+    except Exception as e:
+        print(f"蝦皮爬蟲發生錯誤: {e}")
+        
+    return findings
+        
 def run_scraping_job():
     print("📢 獵人出動：開始搜尋降價商品...")
     new_findings = crawl_threads()
