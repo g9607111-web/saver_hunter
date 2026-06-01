@@ -299,7 +299,7 @@ async function runOCR() {
         } else {
             document.getElementById('p_name').value = "AI 識圖自動生成商品";
         }
-        document.getElementById('p_desc').value = "擷取前30字內容：" + data.text.replace(/\\s+/g, ' ').substring(0, 30);
+       document.getElementById('p_desc').value = "擷取前30字內容：" + data.text.replace(/\\s+/g, ' ').substring(0, 30);
         
         alert('AI 辨識完成！已自動為你填寫表單內容，請手動補齊「市場均價」進行對比。');
     } catch(e) {
