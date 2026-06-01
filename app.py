@@ -9,9 +9,6 @@ import re
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-# 💡 Windows 使用者如果本地測試找不到 Tesseract，請取消下一行註解並確認路徑：
-# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-
 app = Flask(__name__)
 DATA_FILE = "products.json"
 SUBSCRIBERS_FILE = "subscribers.json"
@@ -19,7 +16,6 @@ SUBSCRIBERS_FILE = "subscribers.json"
 GMAIL = "g9607111@gmail.com"
 GMAIL_PASSWORD = "ylpzydzc uzqdkrez"
 
-# --- 資料存取函式 ---
 def load_products():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r", encoding="utf-8") as f:
@@ -40,45 +36,25 @@ def save_subscribers(subscribers):
     with open(SUBSCRIBERS_FILE, "w", encoding="utf-8") as f:
         json.dump(subscribers, f, ensure_ascii=False, indent=2)
 
-# --- 核心功能 3：自動計算平均價與 15% 破盤警示通知 ---
 def send_email_to_all(product):
-    # 檢查是否低於市價 15%
     if product.get('discount', 0) < 15:
-        print(f"📢 商品 {product['name']} 未達 15% 破盤門檻（當前：{product['discount']}%），不發送警示通知。")
         return
-
     subscribers = load_subscribers()
-    if not subscribers:
-        return
-    
     for email in subscribers:
         try:
             msg = MIMEMultipart()
             msg["From"] = GMAIL
             msg["To"] = email
-            msg["Subject"] = f"🚨【省錢獵人暴跌警示】發現超越 15% 破盤好貨：{product['name']}"
-            
-            body = f"""
-🎯 省錢獵人 24H 巡邏回報！偵測到符合低於市價 15% 的特惠商品！
-
-商品名稱：{product['name']}
-市場均價：NT$ {product['market_price']}
-破盤特價：NT$ {product['sale_price']} (🔥 狂省 {product['discount']}%！)
-商品描述：{product['description']}
-
-👉 搶購連結：{product['affiliate_link']}
-
----
-此信件由 省錢獵人 AI 自動發送，狩獵速度決定一切！
-            """
+            msg["Subject"] = f"🚨【省錢獵人】發現破盤好貨：{product['name']}"
+            body = f"商品：{product['name']}\n特價：{product['sale_price']}\n連結：{product['affiliate_link']}"
             msg.attach(MIMEText(body, "plain", "utf-8"))
-            
             server = smtplib.SMTP("smtp.gmail.com", 587)
             server.starttls()
             server.login(GMAIL, GMAIL_PASSWORD)
             server.sendmail(GMAIL, email, msg.as_string())
             server.quit()
-            print(f"⚡ 省錢獵人秒發通知成功 -> {email}")
+        except:
+            pass
 
 def run_scraping_job():
     print("📢 獵人出動：開始搜尋降價商品...")
