@@ -82,7 +82,6 @@ def send_email_to_all(product):
 
 def run_scraping_job():
     print("📢 獵人出動：開始搜尋降價商品...")
-
 # --- HTML 模板介面優化 ---
 TEMPLATE = """
 <!DOCTYPE html>
