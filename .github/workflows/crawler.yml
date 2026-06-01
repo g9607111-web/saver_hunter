@@ -1,0 +1,27 @@
+name: Saver Hunter Crawler
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # 每小時執行一次
+  workflow_dispatch:      # 讓你在 GitHub 網頁上可以手動點擊「執行」
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: pip install pymongo dnspython
+
+      - name: Run Crawler
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          RUN_TYPE: CRAWLER
+        run: python app.py
