@@ -7,3 +7,4 @@ pytesseract
 pillow
 pymongo
 dnspython
+gunicorn
