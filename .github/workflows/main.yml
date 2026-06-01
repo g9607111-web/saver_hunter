@@ -22,5 +22,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run Crawler
+        env:
+          GITHUB_ACTIONS: "true"  # 告訴你的程式現在是在 GitHub 上跑
         run: |
           python app.py
