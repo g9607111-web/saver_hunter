@@ -75,8 +75,9 @@ def send_email_to_all(product):
             server.login(GMAIL, GMAIL_PASSWORD)
             server.sendmail(GMAIL, email, msg.as_string())
             server.quit()
-        except:
-            pass
+except Exception as e:
+            # 這樣在 Render 的 Logs 中，你就會看到具體的錯誤訊息
+            print(f"🚨 發信給 {email} 失敗，錯誤原因：{e}")
 
 import requests
 from bs4 import BeautifulSoup
