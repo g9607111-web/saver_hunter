@@ -23,6 +23,6 @@ jobs:
 
       - name: Run Crawler
         env:
-          GITHUB_ACTIONS: "true"  # 告訴你的程式現在是在 GitHub 上跑
+          RUN_TYPE: "CRAWLER" 
         run: |
           python app.py
