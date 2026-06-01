@@ -1,0 +1,26 @@
+name: Saver Hunter Crawler
+
+on:
+  schedule:
+    - cron: '*/30 * * * *' # 每 30 分鐘執行一次
+  workflow_dispatch: # 讓你隨時可以手動觸發
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run Crawler
+        run: |
+          python app.py
