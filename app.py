@@ -414,10 +414,10 @@ def patrol_webhook():
 import os
 
 if __name__ == "__main__":
-    # 檢查有沒有環境變數叫 RUN_TYPE，如果是 CRAWLER 就不啟動網頁
+    # 使用你在 .github/workflows/main.yml 中設定的環境變數名稱
     if os.getenv("RUN_TYPE") == "CRAWLER":
-        print("正在執行自動化爬蟲任務，跳過網站啟動。")
-        # 這裡可以呼叫你的爬蟲函式，例如: run_scraping_job()
+        print("偵測到 CRAWLER 模式，執行自動化任務...")
+        # 若你有自動化爬蟲函式，請在這裡呼叫
     else:
         # 一般情況下才啟動網站
         app.run(host='0.0.0.0', port=5000, debug=True)
