@@ -59,7 +59,13 @@ def save_subscribers(subscriber_list):
         subscribers_col.insert_many(data_to_insert)
         
 def send_email_to_all(product):
-    if product.get('discount', 0) < 15:
+    # 雙重保險：強制轉成整數，並預防 product 為 None 或缺少 discount 欄位
+    try:
+        discount = int(product.get('discount', 0))
+    except (ValueError, TypeError, AttributeError):
+        discount = 0
+
+    if discount < 15:
         return
     subscribers = load_subscribers()
     for email in subscribers:
@@ -444,19 +450,27 @@ def admin():
 
 @app.route("/admin/add", methods=["POST"])
 def add_product():
-    products = load_products()
-    market = int(request.form["market_price"])
-    sale = int(request.form["sale_price"])
-    discount = int((1 - sale/market) * 100)
+    # 使用 .get() 預防空值，並轉型為整數
+    market = int(request.form.get("market_price", 0))
+    sale = int(request.form.get("sale_price", 0))
     
+    # 強制計算折扣，避免除以零錯誤 (若市場價為0，折扣設為0)
+    if market > 0:
+        discount = int((1 - sale / market) * 100)
+    else:
+        discount = 0
+    
+    # 建立商品字典，強制寫入 discount 欄位
     product = {
-        "name": request.form["name"],
+        "name": request.form.get("name", "未命名商品"),
         "market_price": market,
         "sale_price": sale,
-        "discount": discount,
-        "description": request.form["description"],
-        "affiliate_link": request.form["affiliate_link"] or "#"
+        "discount": discount,  # 強制寫入
+        "description": request.form.get("description", ""),
+        "affiliate_link": request.form.get("affiliate_link", "#")
     }
+    
+    products = load_products()
     products.append(product)
     save_products(products)
     
@@ -464,8 +478,9 @@ def add_product():
     send_email_to_all(product)
     
     subscriber_count = len(load_subscribers())
-    return render_template_string(ADMIN_TEMPLATE, products=products, subscriber_count=subscriber_count, success=f"商品處理完成！若符合 15% 降幅，省錢獵人系統已同步在背景啟動秒發通知機制。")
-
+    return render_template_string(ADMIN_TEMPLATE, products=products, 
+                                  subscriber_count=subscriber_count, 
+                                  success=f"商品處理完成！折扣計算為 {discount}%。")
 @app.route("/admin/delete/<int:idx>", methods=["POST"])
 def delete_product(idx):
     products = load_products()
