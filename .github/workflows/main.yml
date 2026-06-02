@@ -2,8 +2,8 @@ name: Saver Hunter Crawler
 
 on:
   schedule:
-    - cron: '*/30 * * * *' # 每 30 分鐘執行一次
-  workflow_dispatch: # 讓你隨時可以手動觸發
+    - cron: '*/30 * * * *' 
+  workflow_dispatch: 
 
 jobs:
   build:
@@ -23,13 +23,8 @@ jobs:
 
       - name: Run Crawler
         env:
-          RUN_TYPE: "CRAWLER" 
+          RUN_TYPE: "CRAWLER"
+          MONGODB_URI: ${{ secrets.MONGODB_URI }} # 必須加入這行，讓爬蟲連上雲端庫
+          GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }} # 加入這行，讓爬蟲能發信
         run: |
           python app.py
-      - name: Commit and push changes
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add products.json
-          git commit -m "自動更新：透過爬蟲獲取新商品" || echo "無新變更"
-          git push
