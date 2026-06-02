@@ -82,28 +82,7 @@ def send_email_to_all(product):
 import requests
 from bs4 import BeautifulSoup
 
-def crawl_threads():
-    findings = []
-    try:
-        # 範例：發出 HTTP 請求
-        response = requests.get("https://www.threads.net/...") 
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # 假設你解析到的標題是 title，價格是 price
-        # 這邊需要根據你想爬的網站 HTML 結構來寫
-        new_item = {
-            "name": "真實商品名稱", 
-            "market_price": 2000,
-            "sale_price": 1500,
-            "discount": 25,
-            "description": "這是真實爬到的資料！",
-            "affiliate_link": "https://..."
-        }
-        findings.append(new_item)
-    except Exception as e:
-        print(f"爬蟲發生錯誤: {e}")
-    return findings
-
+crawl_threads()
 def crawl_shopee():
     print("🛒 獵人正在搜尋蝦皮商品...")
     findings = []
