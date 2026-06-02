@@ -84,58 +84,91 @@ from bs4 import BeautifulSoup
 
 def crawl_threads():
     findings = []
-    # 這是為了模擬真實瀏覽器，否則 Threads 會秒封你的 GitHub Actions IP
+    # 這裡強化了 Header，讓它看起來更像真實的瀏覽器請求
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7"
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Referer": "https://www.google.com/"
     }
     
-    # 請替換成你要監控的帳號網址
-    target_url = "https://www.threads.net/@coupon.tw" 
+    target_url = "https://www.threads.net/@coupon.tw"
     
     try:
-        response = requests.get(target_url, headers=headers)
+        response = requests.get(target_url, headers=headers, timeout=10)
+        
         if response.status_code == 200:
-            print(f"成功連線！頁面大小: {len(response.text)}")
-            
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # [實戰提示] 
-            # Threads 網頁版通常使用很長的隨機 class 名稱 (例如 x1ypdohk)，
-            # 這類名稱會隨機變動，建議尋找網頁中固定出現的標籤屬性。
-            # 如果發現抓不到任何東西，請先測試這行：
-            # print(soup.find_all('div')) 
+            # [重要] 這裡示範如何找到網頁中的貼文
+            # 因為 Threads 的 class 是亂數，我們改用更穩定的選擇器：查找所有 article 標籤
+            articles = soup.find_all('article')
+            
+            for article in articles:
+                # 簡單提取文字內容
+                text = article.get_text(strip=True)
+                
+                # 這裡是你未來的「AI 過濾器」核心邏輯
+                # 檢查貼文中是否包含價格或特定優惠關鍵字
+                if "特價" in text or "折扣" in text:
+                    findings.append({
+                        "name": "偵測到優惠：" + text[:20], 
+                        "market_price": 1000, # 之後可以加入價格解析邏輯
+                        "sale_price": 800,
+                        "discount": 20,
+                        "description": text[:50],
+                        "affiliate_link": target_url
+                    })
+            
+            print(f"✅ 爬蟲結束，共掃描到 {len(articles)} 篇貼文，篩選出 {len(findings)} 件優惠。")
             
         else:
-            print(f"無法存取 Threads，狀態碼: {response.status_code}")
+            print(f"❌ 無法連線，狀態碼: {response.status_code}")
             
     except Exception as e:
-        print(f"Threads 爬蟲發生錯誤: {e}")
+        print(f"⚠️ 爬蟲發生錯誤: {e}")
         
     return findings
     
 def crawl_shopee():
-    print("🛒 獵人正在搜尋蝦皮商品...")
     findings = []
+    # 搜尋關鍵字
+    keyword = "二手"
+    # 蝦皮搜尋 API (這是公開的 API 結構)
+    api_url = f"https://shopee.tw/api/v4/search/search_items?by=relevancy&keyword={keyword}&limit=10&newest=0&order=desc&page_type=search&version=2"
     
-    # 這裡示範使用 API 獲取資料 (請替換為真實 API 或邏輯)
-    # 你可以去 RapidAPI 找免費的 Shopee API 來替換這裡的 URL
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": "https://shopee.tw/search?keyword=" + keyword,
+        "x-api-source": "pc",
+        "if-none-match-": "55b03-51478147d34193b2a26c483a907297e5" # 這是蝦皮 API 驗證用
+    }
+    
     try:
-        # 這是一個範例架構，你需要替換成實際運作的 API 連結
-        # response = requests.get("https://api.shopee-example.com/search?keyword=二手")
-        # data = response.json()
-        
-        # 為了讓你現在能看到效果，我們先模擬抓到的資料
-        findings.append({
-            "name": "【蝦皮自動偵測】二手精選商品",
-            "market_price": 1200,
-            "sale_price": 900,
-            "discount": 25,
-            "description": "來自蝦皮的優惠商品",
-            "affiliate_link": "https://shopee.tw"
-        })
+        response = requests.get(api_url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            items = data.get('items', [])
+            
+            for item in items:
+                basic = item.get('item_basic', {})
+                name = basic.get('name')
+                price = basic.get('price') / 100000  # 蝦皮價格通常會放大倍數，需除以 100000
+                
+                findings.append({
+                    "name": name,
+                    "market_price": int(price * 1.2), # 假設市價是特價的 1.2 倍
+                    "sale_price": int(price),
+                    "discount": 20, 
+                    "description": "蝦皮熱銷二手商品",
+                    "affiliate_link": f"https://shopee.tw/product/{basic.get('shopid')}/{basic.get('itemid')}"
+                })
+            print(f"✅ 蝦皮狩獵成功！抓取到 {len(findings)} 件商品。")
+        else:
+            print(f"❌ 蝦皮連線失敗，狀態碼: {response.status_code}")
+            
     except Exception as e:
-        print(f"蝦皮爬蟲發生錯誤: {e}")
+        print(f"⚠️ 蝦皮爬蟲錯誤: {e}")
         
     return findings
         
