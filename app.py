@@ -82,7 +82,38 @@ def send_email_to_all(product):
 import requests
 from bs4 import BeautifulSoup
 
-crawl_threads()
+def crawl_threads():
+    findings = []
+    # 這是為了模擬真實瀏覽器，否則 Threads 會秒封你的 GitHub Actions IP
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7"
+    }
+    
+    # 請替換成你要監控的帳號網址
+    target_url = "https://www.threads.net/@coupon.tw" 
+    
+    try:
+        response = requests.get(target_url, headers=headers)
+        if response.status_code == 200:
+            print(f"成功連線！頁面大小: {len(response.text)}")
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # [實戰提示] 
+            # Threads 網頁版通常使用很長的隨機 class 名稱 (例如 x1ypdohk)，
+            # 這類名稱會隨機變動，建議尋找網頁中固定出現的標籤屬性。
+            # 如果發現抓不到任何東西，請先測試這行：
+            # print(soup.find_all('div')) 
+            
+        else:
+            print(f"無法存取 Threads，狀態碼: {response.status_code}")
+            
+    except Exception as e:
+        print(f"Threads 爬蟲發生錯誤: {e}")
+        
+    return findings
+    
 def crawl_shopee():
     print("🛒 獵人正在搜尋蝦皮商品...")
     findings = []
