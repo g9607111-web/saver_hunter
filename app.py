@@ -52,7 +52,12 @@ def send_email_to_all(product):
 
     if discount < 15:
         return
+        
     subscribers = load_subscribers()
+    if not subscribers:
+        print("📢 目前沒有任何訂閱者，跳過發信。")
+        return
+        
     for email in subscribers:
         try:
             msg = MIMEMultipart()
@@ -61,8 +66,9 @@ def send_email_to_all(product):
             msg["Subject"] = f"🚨【省錢獵人】發現破盤好貨：{product['name']}"
             body = f"商品：{product['name']}\n特價：{product['sale_price']}\n連結：{product['affiliate_link']}"
             msg.attach(MIMEText(body, "plain", "utf-8"))
-            server = smtplib.SMTP("smtp.gmail.com", 587)
-            server.starttls()
+            
+            # 💡 終極修正：改用 465 端口與 SMTP_SSL，這在雲端環境最穩定！
+            server = smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=10)
             server.login(GMAIL, GMAIL_PASSWORD)
             server.sendmail(GMAIL, email, msg.as_string())
             server.quit()
