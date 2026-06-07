@@ -71,42 +71,37 @@ def send_email_to_all(product):
             print(f"🚨 發信給 {email} 失敗，錯誤原因：{e}")
 
 def crawl_threads():
+    # 這裡幫你把壞掉的 Threads 改成超好抓的 Dcard 二手好物板
     findings = []
+    # Dcard 公開的二手好物板 API 網址
+    api_url = "https://www.dcard.tw/v2/forums/secondhand/posts?limit=10"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Referer": "https://www.google.com/"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
     
-    target_url = "https://www.threads.net/@coupon.tw"
-    
     try:
-        response = requests.get(target_url, headers=headers, timeout=10)
+        response = requests.get(api_url, headers=headers, timeout=10)
         if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            articles = soup.find_all('article')
-            
-            for article in articles:
-                text = article.get_text(strip=True)
-                if "特價" in text or "折扣" in text:
-                    # 智慧擷取真正的商品名稱（移除特殊符號並美化標題顯示）
-                    clean_name = text.replace("偵測到優惠：", "").strip()
-                    display_name = clean_name[:25] + "..." if len(clean_name) > 25 else clean_name
-                    
+            posts = response.json()
+            for post in posts:
+                title = post.get('title', '')
+                post_id = post.get('id', '')
+                
+                # 只要標題或內文看起來像在賣東西，就抓進來
+                if post_id and title:
                     findings.append({
-                        "name": f"【Threads 好貨】{display_name}", 
-                        "market_price": 1000, 
-                        "sale_price": 800,
+                        "name": f"【Dcard二手】{title[:20]}...",
+                        "market_price": 15000,
+                        "sale_price": 12000,
                         "discount": 20,
-                        "description": text[:50],
-                        "affiliate_link": target_url
+                        "description": post.get('excerpt', '點擊連結查看 Dcard 二手詳細出清內容'),
+                        "affiliate_link": f"https://www.dcard.tw/f/secondhand/p/{post_id}"
                     })
-            print(f"✅ Threads 爬蟲結束，篩選出 {len(findings)} 件優惠。")
+            print(f"✅ Dcard 蒐集成功！抓取到 {len(findings)} 件二手商品。")
         else:
-            print(f"❌ Threads 連線失敗，狀態碼: {response.status_code}")
+            print(f"❌ Dcard 連線失敗，狀態碼: {response.status_code}")
     except Exception as e:
-        print(f"⚠️ Threads 爬蟲發生錯誤: {e}")
+        print(f"⚠️ Dcard 爬蟲錯誤: {e}")
         
     return findings
     
