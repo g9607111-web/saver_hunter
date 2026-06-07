@@ -17,7 +17,7 @@ DATA_FILE = "products.json"
 SUBSCRIBERS_FILE = "subscribers.json"
 
 GMAIL = "g9607111@gmail.com"
-GMAIL_PASSWORD = os.getenv("GMAIL_PASSWORD")
+GMAIL_PASSWORD = "tildtnsatjjjfikc"
 
 # 1. 初始化資料庫連線
 MONGODB_URI = os.getenv("MONGODB_URI")
