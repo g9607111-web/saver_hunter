@@ -1,8 +1,5 @@
 services:
   - type: web
     name: saver-hunter
-    env: python
-    buildCommand: |
-      apt-get update && apt-get install -y tesseract-ocr tesseract-ocr-chi-tra
-      pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    runtime: docker
+    plan: free
