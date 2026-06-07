@@ -8,58 +8,43 @@ import smtplib
 import re
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import requests
+from bs4 import BeautifulSoup
+from pymongo import MongoClient
 
 app = Flask(__name__)
 DATA_FILE = "products.json"
 SUBSCRIBERS_FILE = "subscribers.json"
 
 GMAIL = "g9607111@gmail.com"
-import os
 GMAIL_PASSWORD = os.getenv("GMAIL_PASSWORD")
 
-import os
-from pymongo import MongoClient
-
-# 1. 初始化資料庫連線 (這段放在 import 下方)
+# 1. 初始化資料庫連線
 MONGODB_URI = os.getenv("MONGODB_URI")
 client = MongoClient(MONGODB_URI)
 db = client['saver_db']  # 明確指定資料庫名稱為 'saver_db'
 products_col = db.products
+subscribers_col = db.subscribers
 
-# 2. 修改 load_products 函式 (取代原本的第 12-16 行)
 def load_products():
-    # 改為從 MongoDB 撈取資料
     return list(products_col.find({}, {"_id": 0}))
 
-# 3. 修改 save_products 函式 (取代原本的第 18-20 行)
 def save_products(products):
-    # 先清空資料庫內的舊資料，再存入新的
     products_col.delete_many({})
     if products:
         products_col.insert_many(products)
-# 1. 在程式碼上方宣告 collection (緊接在 products_col 後面)
-subscribers_col = db.subscribers
 
-# 1. 宣告 subscribers collection
-subscribers_col = db.subscribers
-
-# 2. 修改 load_subscribers 函式
 def load_subscribers():
-    # 從 MongoDB 撈取資料，回傳 email 列表
     subscribers = list(subscribers_col.find({}, {"_id": 0}))
     return [s['email'] for s in subscribers] if subscribers else []
 
-# 3. 修改 save_subscribers 函式
 def save_subscribers(subscriber_list):
-    # 先清空資料庫內的舊資料
     subscribers_col.delete_many({})
-    # 存入新的訂閱者列表
     if subscriber_list:
         data_to_insert = [{"email": email} for email in subscriber_list]
         subscribers_col.insert_many(data_to_insert)
         
 def send_email_to_all(product):
-    # 雙重保險：強制轉成整數，並預防 product 為 None 或缺少 discount 欄位
     try:
         discount = int(product.get('discount', 0))
     except (ValueError, TypeError, AttributeError):
@@ -81,16 +66,12 @@ def send_email_to_all(product):
             server.login(GMAIL, GMAIL_PASSWORD)
             server.sendmail(GMAIL, email, msg.as_string())
             server.quit()
+            print(f"📧 成功發送通知信給：{email}")
         except Exception as e:
-            # 這樣在 Render 的 Logs 中，你就會看到具體的錯誤訊息
             print(f"🚨 發信給 {email} 失敗，錯誤原因：{e}")
-
-import requests
-from bs4 import BeautifulSoup
 
 def crawl_threads():
     findings = []
-    # 這裡強化了 Header，讓它看起來更像真實的瀏覽器請求
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
@@ -102,77 +83,70 @@ def crawl_threads():
     
     try:
         response = requests.get(target_url, headers=headers, timeout=10)
-        
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
-            
-            # [重要] 這裡示範如何找到網頁中的貼文
-            # 因為 Threads 的 class 是亂數，我們改用更穩定的選擇器：查找所有 article 標籤
             articles = soup.find_all('article')
             
             for article in articles:
-                # 簡單提取文字內容
                 text = article.get_text(strip=True)
-                
-                # 這裡是你未來的「AI 過濾器」核心邏輯
-                # 檢查貼文中是否包含價格或特定優惠關鍵字
                 if "特價" in text or "折扣" in text:
+                    # 智慧擷取真正的商品名稱（移除特殊符號並美化標題顯示）
+                    clean_name = text.replace("偵測到優惠：", "").strip()
+                    display_name = clean_name[:25] + "..." if len(clean_name) > 25 else clean_name
+                    
                     findings.append({
-                        "name": "偵測到優惠：" + text[:20], 
-                        "market_price": 1000, # 之後可以加入價格解析邏輯
+                        "name": f"【Threads 好貨】{display_name}", 
+                        "market_price": 1000, 
                         "sale_price": 800,
                         "discount": 20,
                         "description": text[:50],
                         "affiliate_link": target_url
                     })
-            
-            print(f"✅ 爬蟲結束，共掃描到 {len(articles)} 篇貼文，篩選出 {len(findings)} 件優惠。")
-            
+            print(f"✅ Threads 爬蟲結束，篩選出 {len(findings)} 件優惠。")
         else:
-            print(f"❌ 無法連線，狀態碼: {response.status_code}")
-            
+            print(f"❌ Threads 連線失敗，狀態碼: {response.status_code}")
     except Exception as e:
-        print(f"⚠️ 爬蟲發生錯誤: {e}")
+        print(f"⚠️ Threads 爬蟲發生錯誤: {e}")
         
     return findings
     
 def crawl_shopee():
     findings = []
-    # 搜尋關鍵字
     keyword = "二手"
-    # 蝦皮搜尋 API (這是公開的 API 結構)
     api_url = f"https://shopee.tw/api/v4/search/search_items?by=relevancy&keyword={keyword}&limit=10&newest=0&order=desc&page_type=search&version=2"
     
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Referer": "https://shopee.tw/search?keyword=" + keyword,
         "x-api-source": "pc",
-        "if-none-match-": "55b03-51478147d34193b2a26c483a907297e5" # 這是蝦皮 API 驗證用
+        "if-none-match-": "55b03-51478147d34193b2a26c483a907297e5"
     }
     
     try:
         response = requests.get(api_url, headers=headers, timeout=10)
         if response.status_code == 200:
             data = response.json()
-            items = data.get('items', [])
+            items = data.get('items', []) or []
             
             for item in items:
                 basic = item.get('item_basic', {})
                 name = basic.get('name')
-                price = basic.get('price') / 100000  # 蝦皮價格通常會放大倍數，需除以 100000
-                
+                price_raw = basic.get('price')
+                if not name or price_raw is None:
+                    continue
+                    
+                price = price_raw / 100000
                 findings.append({
-                    "name": name,
-                    "market_price": int(price * 1.2), # 假設市價是特價的 1.2 倍
+                    "name": f"【蝦皮二手】{name}",
+                    "market_price": int(price * 1.25), 
                     "sale_price": int(price),
                     "discount": 20, 
-                    "description": "蝦皮熱銷二手商品",
+                    "description": "系統自動偵測之熱銷二手商品",
                     "affiliate_link": f"https://shopee.tw/product/{basic.get('shopid')}/{basic.get('itemid')}"
                 })
             print(f"✅ 蝦皮狩獵成功！抓取到 {len(findings)} 件商品。")
         else:
-            print(f"❌ 蝦皮連線失敗，狀態碼: {response.status_code}")
-            
+            print(f"❌ 蝦皮連線受阻（API 限制），狀態碼: {response.status_code}")
     except Exception as e:
         print(f"⚠️ 蝦皮爬蟲錯誤: {e}")
         
@@ -184,7 +158,6 @@ def run_scraping_job():
     
     if new_findings:
         all_products = load_products()
-        # 簡單去重：利用商品名稱來過濾已存在的商品
         existing_names = {p['name'] for p in all_products}
         new_unique_findings = [p for p in new_findings if p['name'] not in existing_names]
         
@@ -193,11 +166,12 @@ def run_scraping_job():
             save_products(all_products)
             for p in new_unique_findings:
                 send_email_to_all(p)
-            print(f"✅ 狩獵成功！本次新增 {len(new_unique_findings)} 件商品。")
+            print(f"✅ 狩獵成功！本次新上架 {len(new_unique_findings)} 件商品並處理信件。")
         else:
             print("⚠️ 未發現新商品（已過濾重複）。")
     else:
-        print("⚠️ 本次巡邏未發現任何商品。")
+        print("⚠️ 本次巡邏未發現任何可用商品。")
+
 # --- HTML 模板介面優化 ---
 TEMPLATE = """
 <!DOCTYPE html>
@@ -220,7 +194,7 @@ TEMPLATE = """
   .stat p { color: #666; font-size: 14px; }
   .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 15px; }
   .product-card { background: white; border-radius: 12px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-top: 4px solid #2980b9; position: relative;}
-  .product-card h3 { font-size: 15px; margin-bottom: 10px; color: #333; }
+  .product-card h3 { font-size: 15px; margin-bottom: 10px; color: #333; height: 44px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .original-price { color: #999; text-decoration: line-through; font-size: 14px; }
   .sale-price { color: #e74c3c; font-size: 22px; font-weight: bold; }
   .badge { display: inline-block; background: #e74c3c; color: white; padding: 3px 10px; border-radius: 20px; font-size: 12px; margin: 8px 0; font-weight: bold; }
@@ -359,7 +333,7 @@ ADMIN_TEMPLATE = """
     <input name="description" id="p_desc" placeholder="例如：由 AI 識圖自動帶入或手動輸入描述">
   </div>
   <div class="form-group">
-    <label>商品連結 / 平台出處</label>3
+    <label>商品連結 / 平台出處</label>
     <input name="affiliate_link" placeholder="貼上蝦皮、露天或 IG 貼文網址">
   </div>
   <button type="submit">➕ 確認上架並進行 15% 警示校對</button>
@@ -387,7 +361,6 @@ async function runOCR() {
         let report = `【AI 識別報告】<br>🔹 找到的所有可能價格：${data.prices.join(', ') || '未偵測到'}<br>🔹 找到的可能折扣碼：${data.promos.join(', ') || '未偵測到'}`;
         resultDiv.innerHTML = report;
 
-        // 智慧帶入表單欄位
         if(data.prices.length > 0) {
             document.getElementById('p_sale').value = data.prices[0];
         }
@@ -396,7 +369,7 @@ async function runOCR() {
         } else {
             document.getElementById('p_name').value = "AI 識圖自動生成商品";
         }
-       document.getElementById('p_desc').value = "擷取前30字內容：" + data.text.replace(/\\s+/g, ' ').substring(0, 30);
+       document.getElementById('p_desc').value = "擷取前30字內容：" + data.text.replace(/\s+/g, ' ').substring(0, 30);
         
         alert('AI 辨識完成！已自動為你填寫表單內容，請手動補齊「市場均價」進行對比。');
     } catch(e) {
@@ -427,6 +400,12 @@ async function runOCR() {
 
 @app.route("/")
 def index():
+    # 💡 核心改良：每次使用者打開首頁，就在背景自動執行一次爬蟲，確保一定能抓到最新好貨並觸發信件
+    try:
+        run_scraping_job()
+    except Exception as e:
+        print(f"背景自動爬蟲失敗: {e}")
+        
     products = load_products()
     subscriber_count = len(load_subscribers())
     return render_template_string(TEMPLATE, products=products, subscriber_count=subscriber_count, success=None)
@@ -450,22 +429,19 @@ def admin():
 
 @app.route("/admin/add", methods=["POST"])
 def add_product():
-    # 使用 .get() 預防空值，並轉型為整數
     market = int(request.form.get("market_price", 0))
     sale = int(request.form.get("sale_price", 0))
     
-    # 強制計算折扣，避免除以零錯誤 (若市場價為0，折扣設為0)
     if market > 0:
         discount = int((1 - sale / market) * 100)
     else:
         discount = 0
     
-    # 建立商品字典，強制寫入 discount 欄位
     product = {
         "name": request.form.get("name", "未命名商品"),
         "market_price": market,
         "sale_price": sale,
-        "discount": discount,  # 強制寫入
+        "discount": discount,  
         "description": request.form.get("description", ""),
         "affiliate_link": request.form.get("affiliate_link", "#")
     }
@@ -474,13 +450,13 @@ def add_product():
     products.append(product)
     save_products(products)
     
-    # 調用警示校對函式
     send_email_to_all(product)
     
     subscriber_count = len(load_subscribers())
     return render_template_string(ADMIN_TEMPLATE, products=products, 
                                   subscriber_count=subscriber_count, 
                                   success=f"商品處理完成！折扣計算為 {discount}%。")
+
 @app.route("/admin/delete/<int:idx>", methods=["POST"])
 def delete_product(idx):
     products = load_products()
@@ -489,7 +465,6 @@ def delete_product(idx):
         save_products(products)
     return redirect("/admin")
 
-# --- AI 精準識圖 OCR 路由 ---
 @app.route("/ocr", methods=["POST"])
 def ocr():
     if 'image' not in request.files:
@@ -498,17 +473,12 @@ def ocr():
     img = Image.open(io.BytesIO(file.read()))
     
     text = pytesseract.image_to_string(img, lang='chi_tra+eng')
-    
-    # 2a. 抓取手寫或網頁上的價格（支援 $、NT$、或是 3-6 位數的純數字）
     prices = re.findall(r'(?:NT\$?|\$)?\s*(\d{3,6})', text)
     prices = [p for p in prices if int(p) != 2026]
-    
-    # 2b. 抓取大寫隱藏折價碼（如貼文中的 SAVE15, OFF30, DISCOUNT10）
     promos = re.findall(r'([A-Z]{3,10}\d{2,3})', text)
     
     return jsonify({"text": text, "prices": prices, "promos": promos})
 
-# --- 模擬 24 小時跨平台巡邏 API 接口 ---
 @app.route("/api/patrol_webhook", methods=["POST"])
 def patrol_webhook():
     data = request.json
@@ -536,17 +506,7 @@ def patrol_webhook():
     
     return jsonify({"status": "巡邏完成", "discount": discount, "alert_triggered": discount >= 15})
 
-import os
-
 if __name__ == '__main__':
-    # 讀取 Render 分配的 PORT
     port = int(os.environ.get("PORT", 5000))
-    
-    # 判斷模式：只有明確設定為 CRAWLER 環境變數才跑爬蟲
-    # 這樣可以確保預設情況下，Render 會跑進 else 啟動網頁服務
-    if os.environ.get("RUN_TYPE") == "CRAWLER":
-        print("偵測到 CRAWLER 模式，執行自動化任務...")
-        run_scraping_job()
-    else:
-        print(f"啟動網頁服務，監聽 Port: {port}")
-        app.run(host='0.0.0.0', port=port)
+    print(f"啟動省錢獵人網頁服務，監聽 Port: {port}")
+    app.run(host='0.0.0.0', port=port)
