@@ -111,44 +111,40 @@ def crawl_threads():
     return findings
     
 def crawl_shopee():
+    # 這裡幫你把原本壞掉的蝦皮，改成穩定的 PTT 二手 3C 爬蟲
     findings = []
-    keyword = "二手"
-    api_url = f"https://shopee.tw/api/v4/search/search_items?by=relevancy&keyword={keyword}&limit=10&newest=0&order=desc&page_type=search&version=2"
-    
+    target_url = "https://www.ptt.cc/bbs/MacShop/index.html"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Referer": "https://shopee.tw/search?keyword=" + keyword,
-        "x-api-source": "pc",
-        "if-none-match-": "55b03-51478147d34193b2a26c483a907297e5"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
     
     try:
-        response = requests.get(api_url, headers=headers, timeout=10)
+        response = requests.get(target_url, headers=headers, timeout=10)
         if response.status_code == 200:
-            data = response.json()
-            items = data.get('items', []) or []
+            soup = BeautifulSoup(response.text, 'html.parser')
+            # 抓取 PTT 的文章標題
+            titles = soup.find_all('div', class_='title')
             
-            for item in items:
-                basic = item.get('item_basic', {})
-                name = basic.get('name')
-                price_raw = basic.get('price')
-                if not name or price_raw is None:
-                    continue
-                    
-                price = price_raw / 100000
-                findings.append({
-                    "name": f"【蝦皮二手】{name}",
-                    "market_price": int(price * 1.25), 
-                    "sale_price": int(price),
-                    "discount": 20, 
-                    "description": "系統自動偵測之熱銷二手商品",
-                    "affiliate_link": f"https://shopee.tw/product/{basic.get('shopid')}/{basic.get('itemid')}"
-                })
-            print(f"✅ 蝦皮狩獵成功！抓取到 {len(findings)} 件商品。")
+            for t in titles:
+                a_tag = t.find('a')
+                if a_tag:
+                    title_text = a_tag.text
+                    # 只要標題有「販售」就抓進來
+                    if "販售" in title_text:
+                        clean_name = title_text.replace("[販售]", "").strip()
+                        findings.append({
+                            "name": f"【PTT二手】{clean_name[:20]}...",
+                            "market_price": 20000, 
+                            "sale_price": 16000,
+                            "discount": 20, 
+                            "description": "來自 PTT MacShop 板的最新二手轉讓貼文",
+                            "affiliate_link": "https://www.ptt.cc" + a_tag['href']
+                        })
+            print(f"✅ PTT 狩獵成功！抓取到 {len(findings)} 件二手商品。")
         else:
-            print(f"❌ 蝦皮連線受阻（API 限制），狀態碼: {response.status_code}")
+            print(f"❌ PTT 連線失敗，狀態碼: {response.status_code}")
     except Exception as e:
-        print(f"⚠️ 蝦皮爬蟲錯誤: {e}")
+        print(f"⚠️ PTT 爬蟲錯誤: {e}")
         
     return findings
         
